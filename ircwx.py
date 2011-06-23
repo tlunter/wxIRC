@@ -13,12 +13,14 @@ import defaults
 from serverlist import ServerListFrame
 from addserver import AddServerFrame
 from chat import ChatFrame
+from ircclient import IRCClient
 
 class wxIRC(wx.App):
     def OnInit(self):
         self.ServerListFrame = None
         self.AddServerFrame = None
         self.ChatFrame = None
+        self.IRCClient = None
         
         try:
             pklfile = open('data.pkl','rb')
@@ -71,12 +73,12 @@ class wxIRC(wx.App):
         if self.AddServerFrame.ServerPort == '':
             self.AddServerFrame.ServerPort = 6667
             
-        if self.AddServerFrame.ServerURL == '':
-            dlg = wx.MessageDialog(self.AddServerFrame, "Please add a Server URL!","Missing field", wx.OK)
+        if str(self.AddServerFrame.ServerName.GetValue()).strip() == '' or str(self.AddServerFrame.ServerURL.GetValue()).strip() == '':
+            dlg = wx.MessageDialog(self.AddServerFrame, "Please add a Server URL or Name!","Missing field", wx.OK)
             dlg.ShowModal()
             dlg.Destroy()
         else:
-            self.servers.append({'name':str(self.AddServerFrame.ServerName.GetValue()),'url':str(self.AddServerFrame.ServerURL.GetValue()),'port':int(self.AddServerFrame.ServerPort.GetValue()),'username':str(self.AddServerFrame.ServerUsername.GetValue()),'password':str(self.AddServerFrame.ServerPassword.GetValue())})
+            self.servers.append({'name':str(self.AddServerFrame.ServerName.GetValue()).strip(),'url':str(self.AddServerFrame.ServerURL.GetValue()).strip(),'port':int(self.AddServerFrame.ServerPort.GetValue()),'username':str(self.AddServerFrame.ServerUsername.GetValue()),'password':str(self.AddServerFrame.ServerPassword.GetValue())})
             self.SetUpServerList()
     
     #----------------------------------------------------------------------
@@ -91,7 +93,28 @@ class wxIRC(wx.App):
         
         self.SetUpMenuBarFor(self.ChatFrame)
         
-        self.SwitchWindows(self.ChatFrame)    
+        self.SwitchWindows(self.ChatFrame)
+                
+        self.IRCClient = IRCClient(server)
+        i = 0
+        self.IRCClient.irc.recv(4096)
+        self.IRCClient.irc.send('NICK wxirc\r\n')
+        self.IRCClient.irc.send('USER wxirc wxirc wxirc :Python is awesomesauce\r\n' )
+        self.IRCClient.irc.send('PRIVMSG NickServ :identify \r\n')
+        self.IRCClient.irc.send('JOIN #wxirc\r\n')
+        while True and i < 10:
+            i += 1
+            data = self.IRCClient.StartRecv()
+            datasplit = data.split('\r\n')[:-1]
+            print 'data: ' + str(data)
+            for item in datasplit:
+                itemdata = item.split(':',2)
+                if len(itemdata) > 2 and len(itemdata) < 4:
+                    if(itemdata[1].find('!') > -1):
+                        username = itemdata[1].split('!')
+                    else:
+                        username = itemdata[1].split(' ')
+                    self.ChatFrame.InsertRow({'username':username[0],'message':itemdata[2]})
         
     #----------------------------------------------------------------------
     #

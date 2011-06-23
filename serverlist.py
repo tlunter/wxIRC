@@ -48,7 +48,6 @@ class ServerListFrame(wx.Frame):
         
     def SetServers(self,servers):
         self.ServerListChoices = servers
-        print servers
         self.ServerList.Set([server['name'] for server in self.ServerListChoices])
         
     def OnQuit(self, event):
