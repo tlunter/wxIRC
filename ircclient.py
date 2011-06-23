@@ -6,5 +6,4 @@ class IRCClient():
         self.irc.connect((str(server['url']) , server['port']))
         
     def StartRecv(self):
-        self.irc.send('JOIN #reddit')
         return self.irc.recv(4096)
