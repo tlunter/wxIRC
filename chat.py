@@ -43,3 +43,15 @@ class ChatFrame(wx.Frame):
         ItemCount = self.ServerList.GetItemCount()
         self.ServerList.InsertStringItem(ItemCount,' ' + str(data['username']))
         self.ServerList.SetStringItem(ItemCount,1,' ' + str(data['message']))
+        
+    def SendData(self, data):
+        datasplit = data.split('\r\n')[:-1]
+        for item in datasplit:
+            itemdata = item.split(':',2)
+            if len(itemdata) > 2 and len(itemdata) < 4:
+                if(itemdata[1].find('!') > -1):
+                    username = itemdata[1].split('!')
+                else:
+                    username = itemdata[1].split(' ')
+                self.InsertRow({'username':username[0],'message':itemdata[2]})
+                self.ServerList.ScrollList(0,self.ServerList.GetItemCount())
