@@ -14,51 +14,7 @@ from serverlist import ServerListFrame
 from addserver import AddServerFrame
 from chat import ChatFrame
 from ircclient import IRCClient
-from threading import *
 import thread
-import time
-
-EVT_RESULT_ID = wx.NewId()
-
-def EVT_RESULT(win, func):
-    """Define Result Event."""
-    win.Connect(-1, -1, EVT_RESULT_ID, func)
-    
-class ResultEvent(wx.PyEvent):
-    """Simple event to carry arbitrary result data."""
-    def __init__(self, data):
-        """Init Result Event."""
-        wx.PyEvent.__init__(self)
-        self.SetEventType(EVT_RESULT_ID)
-        self.data = data
-        
-class WorkerThread(Thread):
-    """Worker Thread Class."""
-    def __init__(self, notify_window, ircclient):
-        """Init Worker Thread Class."""
-        Thread.__init__(self)
-        self._ircclient = ircclient
-        self._notify_window = notify_window
-        self._want_abort = 0
-        # This starts the thread running on creation, but you could
-        # also make the GUI thread responsible for calling this
-        self.start()
-
-    def run(self):
-        """Run Worker Thread."""
-        if self._want_abort:
-            wx.PostEvent(self._notify_window, ResultEvent(-1))
-            return
-        
-        data = self._ircclient.StartRecv()
-        
-        print "Data: " + data
-        wx.PostEvent(self._notify_window, ResultEvent(data))
-
-    def abort(self):
-        """abort worker thread."""
-        # Method for use by main thread to signal an abort
-        self._want_abort = 1
 
 class wxIRC(wx.App):
     def OnInit(self):
@@ -135,38 +91,15 @@ class wxIRC(wx.App):
     def SetUpChat(self, server):
         if not self.ChatFrame:
             self.ChatFrame = ChatFrame(None)
+            self.ChatFrame.SetSize(wx.Size(450,225))
         
         self.SetUpMenuBarFor(self.ChatFrame)
         
         self.SwitchWindows(self.ChatFrame)
                 
-        self.IRCClient = IRCClient(server)
+        self.IRCClient = IRCClient(server, self.ChatFrame)
         
-        EVT_RESULT(self.ChatFrame,self.OnResult)
-        
-        self.worker = None
-        
-        self.background = thread.start_new_thread(self.ChatStart, ())
-        
-        self.IRCClient.irc.send('NICK wxirc\r\n')
-        self.IRCClient.irc.send('USER wxirc wxirc wxirc :Python is awesomesauce\r\n' )
-        self.IRCClient.irc.send('PRIVMSG NickServ :identify wxirc1\r\n')
-        self.IRCClient.irc.send('JOIN #wxirc\r\n')
-        
-    def ChatStart(self):
-        if not self.worker:
-            self.worker = WorkerThread(self.ChatFrame, self.IRCClient)
-        
-    def OnResult(self, event):
-        if event.data != -1:
-            if event.data.find ( 'PING' ) != -1:
-                self.IRCClient.irc.send('PONG ' + event.data.split()[1] + '\r\n')
-            wx.CallAfter(self.ChatFrame.SendData, event.data)
-            self.worker = None
-            self.ChatStart()
-        else:
-            self.background.exit()
-            
+        self.background = thread.start_new_thread(self.IRCClient.StartRecv, ())
         
     #----------------------------------------------------------------------
     #
@@ -208,10 +141,7 @@ class wxIRC(wx.App):
         self.Bind(wx.EVT_MENU, self.SetUpServerList, frame.ServerListItem)
         self.Bind(wx.EVT_MENU, self.OnQuit, frame.QuitItem)
     
-    def OnQuit(self, event=None):        
-        if self.worker:
-            self.worker.abort()
-                    
+    def OnQuit(self, event=None):
         pklfile = open('data.pkl','wb')
 
         data = [self.servers]
